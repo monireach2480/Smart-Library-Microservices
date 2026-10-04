@@ -1,0 +1,101 @@
+# All 9 services + PostgreSQL on ONE machine - for development / a quick demo.
+# For the real deployment (one compose file per EC2 instance) see deploy/.
+#   cp .env.example .env   (fill it in)   &&   docker compose up --build
+x-env: &common-env
+  SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env (at least 32 characters)}
+  INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Set INTERNAL_API_KEY in .env}
+  ADMIN_REGISTRATION_KEY: ${ADMIN_REGISTRATION_KEY:?Set ADMIN_REGISTRATION_KEY in .env}
+
+x-db: &db-wait
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-library}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-library}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  gateway:
+    build: ./services/gateway
+    environment: *common-env
+    ports: ["8000:8000"]
+
+  registration-service:
+    build: ./services/registration-service
+    <<: *db-wait
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/auth_db
+    ports: ["8001:8001"]
+
+  login-service:
+    build: ./services/login-service
+    <<: *db-wait
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/auth_db
+    ports: ["8002:8002"]
+
+  catalog-service:
+    build: ./services/catalog-service
+    <<: *db-wait
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/catalog_db
+    ports: ["8003:8003"]
+
+  member-service:
+    build: ./services/member-service
+    <<: *db-wait
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/auth_db
+    ports: ["8004:8004"]
+
+  inventory-service:
+    build: ./services/inventory-service
+    <<: *db-wait
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/inventory_db
+    ports: ["8005:8005"]
+
+  borrowing-service:
+    build: ./services/borrowing-service
+    <<: *db-wait
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/borrowing_db
+    ports: ["8006:8006"]
+
+  fine-service:
+    build: ./services/fine-service
+    <<: *db-wait
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/fine_db
+    ports: ["8007:8007"]
+
+  review-service:
+    build: ./services/review-service
+    <<: *db-wait
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/review_db
+    ports: ["8008:8008"]
+
+volumes:
+  pgdata:
