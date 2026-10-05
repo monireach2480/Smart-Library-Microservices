@@ -1,0 +1,58 @@
+# EC2 #1  -  API Gateway, Registration, Login  (+ the PostgreSQL server for every service)
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-library}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-library}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "5432:5432"        # security group: allow 5432 ONLY from the library security group
+
+  gateway:
+    build: ../../services/gateway
+    restart: unless-stopped
+    environment:
+      SECRET_KEY: ${SECRET_KEY:?set in .env}
+      REGISTRATION_URL: http://registration-service:8001
+      LOGIN_URL: http://login-service:8002
+      CATALOG_URL: http://${EC2_2_IP:?set in .env}:8003
+      MEMBER_URL: http://${EC2_2_IP}:8004
+      INVENTORY_URL: http://${EC2_3_IP:?set in .env}:8005
+      BORROWING_URL: http://${EC2_3_IP}:8006
+      FINE_URL: http://${EC2_4_IP:?set in .env}:8007
+      REVIEW_URL: http://${EC2_4_IP}:8008
+    ports: ["8000:8000"]   # the only port that is open to the internet
+
+  registration-service:
+    build: ../../services/registration-service
+    restart: unless-stopped
+    depends_on:
+      postgres: {condition: service_healthy}
+    environment:
+      SECRET_KEY: ${SECRET_KEY}
+      ADMIN_REGISTRATION_KEY: ${ADMIN_REGISTRATION_KEY:?set in .env}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/auth_db
+    ports: ["8001:8001"]
+
+  login-service:
+    build: ../../services/login-service
+    restart: unless-stopped
+    depends_on:
+      postgres: {condition: service_healthy}
+    environment:
+      SECRET_KEY: ${SECRET_KEY}
+      ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-60}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/auth_db
+    ports: ["8002:8002"]
+
+volumes:
+  pgdata:
