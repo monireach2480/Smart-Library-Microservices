@@ -1,0 +1,41 @@
+{
+  "gateway": "up",
+  "services": {
+    "registration": "up",
+    "login": "up",
+    "catalog": "up (3/3 instances)",
+    "member": "up",
+    "inventory": "up",
+    "borrowing": "up",
+    "fine": "up",
+    "review": "up"
+  },
+  "instances": {
+    "registration": {
+      "http://127.0.0.1:8001": "up"
+    },
+    "login": {
+      "http://127.0.0.1:8002": "up"
+    },
+    "catalog": {
+      "http://127.0.0.1:8003": "up",
+      "http://127.0.0.1:8013": "up",
+      "http://127.0.0.1:8023": "up"
+    },
+    "member": {
+      "http://127.0.0.1:8004": "up"
+    },
+    "inventory": {
+      "http://127.0.0.1:8005": "up"
+    },
+    "borrowing": {
+      "http://127.0.0.1:8006": "up"
+    },
+    "fine": {
+      "http://127.0.0.1:8007": "up"
+    },
+    "review": {
+      "http://127.0.0.1:8008": "up"
+    }
+  }
+}

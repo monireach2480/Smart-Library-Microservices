@@ -1,0 +1,136 @@
+# Smart Library - ALL services + PostgreSQL on one machine (development / quick demo).
+# The real deployment uses one compose file per EC2 instance: see deploy/.
+#
+#   cp .env.example .env        (fill it in)
+#   docker compose up --build   (gateway: http://localhost:8000)
+#   docker compose -f docker-compose.yml -f docker-compose.debug.yml up --build   (also publishes every service port)
+name: smart-library
+
+x-env: &common-env
+  SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env (at least 32 characters)}
+  INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Set INTERNAL_API_KEY in .env}
+  ADMIN_REGISTRATION_KEY: ${ADMIN_REGISTRATION_KEY:?Set ADMIN_REGISTRATION_KEY in .env}
+
+# Catalog runs as 3 replicas; the gateway (and every service that calls Catalog) round-robins over them.
+x-catalog-urls: &catalog-urls "http://catalog-service-1:8003,http://catalog-service-2:8003,http://catalog-service-3:8003"
+
+# Shared settings of every application container: restart policy + networks + wait for a healthy database.
+x-app: &app
+  restart: unless-stopped
+  networks: [backend, db]
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+networks:
+  backend:      # service <-> service traffic; only the gateway publishes a port to the host
+  db:           # PostgreSQL is reachable only from services that need a database (not from the gateway)
+
+volumes:
+  pgdata:
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    networks: [db]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-library}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-library}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  gateway:
+    build: ./services/gateway
+    restart: unless-stopped
+    networks: [backend]
+    environment:
+      <<: *common-env
+      CATALOG_URL: *catalog-urls
+    ports: ["8000:8000"]
+    depends_on:
+      registration-service: {condition: service_healthy}
+      login-service: {condition: service_healthy}
+      catalog-service-1: {condition: service_healthy}
+      catalog-service-2: {condition: service_healthy}
+      catalog-service-3: {condition: service_healthy}
+      member-service: {condition: service_healthy}
+      inventory-service: {condition: service_healthy}
+      borrowing-service: {condition: service_healthy}
+      fine-service: {condition: service_healthy}
+      review-service: {condition: service_healthy}
+
+  registration-service:
+    <<: *app
+    build: ./services/registration-service
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/auth_db
+
+  login-service:
+    <<: *app
+    build: ./services/login-service
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/auth_db
+
+  catalog-service-1: &catalog
+    <<: *app
+    build: ./services/catalog-service
+    environment: &catalog-env
+      <<: *common-env
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/catalog_db
+      INSTANCE_ID: catalog-1
+  catalog-service-2:
+    <<: *catalog
+    environment:
+      <<: *catalog-env
+      INSTANCE_ID: catalog-2
+  catalog-service-3:
+    <<: *catalog
+    environment:
+      <<: *catalog-env
+      INSTANCE_ID: catalog-3
+
+  member-service:
+    <<: *app
+    build: ./services/member-service
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/auth_db
+
+  inventory-service:
+    <<: *app
+    build: ./services/inventory-service
+    environment:
+      <<: *common-env
+      CATALOG_URL: *catalog-urls
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/inventory_db
+
+  borrowing-service:
+    <<: *app
+    build: ./services/borrowing-service
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/borrowing_db
+
+  fine-service:
+    <<: *app
+    build: ./services/fine-service
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/fine_db
+
+  review-service:
+    <<: *app
+    build: ./services/review-service
+    environment:
+      <<: *common-env
+      CATALOG_URL: *catalog-urls
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/review_db

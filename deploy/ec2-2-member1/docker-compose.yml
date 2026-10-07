@@ -1,0 +1,39 @@
+# EC2 #2  -  Member 1:  Catalog service (3 load-balanced replicas) + Member service
+# The three replicas are separate containers listening on host ports 8003, 8013 and 8023.
+# The gateway (EC2 #1), inventory (EC2 #3) and review (EC2 #4) services list all three URLs and round-robin over them.
+x-catalog: &catalog
+  build: ../../services/catalog-service
+  image: smart-library/catalog-service
+  restart: unless-stopped
+  environment: &catalog-env
+    SECRET_KEY: ${SECRET_KEY:?set in .env}
+    DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD:?set in .env}@${DB_HOST:?set in .env}:5432/catalog_db
+    INSTANCE_ID: ec2-2-catalog-1
+
+services:
+  catalog-service-1:
+    <<: *catalog
+    ports: ["8003:8003"]
+
+  catalog-service-2:
+    <<: *catalog
+    environment:
+      <<: *catalog-env
+      INSTANCE_ID: ec2-2-catalog-2
+    ports: ["8013:8003"]
+
+  catalog-service-3:
+    <<: *catalog
+    environment:
+      <<: *catalog-env
+      INSTANCE_ID: ec2-2-catalog-3
+    ports: ["8023:8003"]
+
+  member-service:
+    build: ../../services/member-service
+    restart: unless-stopped
+    environment:
+      SECRET_KEY: ${SECRET_KEY}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?set in .env}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@${DB_HOST}:5432/auth_db
+    ports: ["8004:8004"]
