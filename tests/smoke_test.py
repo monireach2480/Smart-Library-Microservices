@@ -40,6 +40,9 @@ print("== Gateway ==")
 check("gateway health", c.get("/health"), 200)
 r = check("downstream services health", c.get("/health/services"), 200)
 print("   ", r.json()["services"])
+hr = c.get("/api/books", params={"page_size": 1})
+check("gateway adds X-Upstream / X-Served-By / X-Request-ID", httpx.Response(200 if all(k in hr.headers for k in ("x-upstream", "x-served-by", "x-request-id")) else 500), 200)
+check("/lb/stats needs a token", c.get("/lb/stats"), 401)
 check("internal endpoints blocked", c.post("/api/inventory/internal/checkout", json={"book_id": 1}), 403)
 
 print("== Registration ==")
@@ -74,8 +77,10 @@ check("member renames self", c.put(f"/api/members/{member_id}", headers=auth(mem
 
 print("== Catalog service ==")
 isbn = "9780132350884"  # Clean Code
-r = check("admin adds book", c.post("/api/books", headers=auth(admin_tok), json={
-    "title": f"Clean Code {run}", "author": "Robert C. Martin", "isbn": isbn, "category": "Software", "published_year": 2008}), 201)
+r = c.post("/api/books", headers=auth(admin_tok), json={
+    "title": f"Clean Code {run}", "author": "Robert C. Martin", "isbn": isbn, "category": "Software", "published_year": 2008})
+# 409 only means a previous run / the Postman collection already created this ISBN: the system is re-runnable
+check("admin adds book (or ISBN already exists from an earlier run)", r, 201 if r.status_code != 409 else 409)
 if r.status_code == 409:
     r = c.get("/api/books", params={"q": isbn})
     book_id = r.json()["items"][0]["id"]
@@ -89,11 +94,22 @@ check("categories", c.get("/api/categories"), 200)
 check("admin updates book", c.put(f"/api/books/{book_id}", headers=auth(admin_tok), json={
     "title": f"Clean Code {run}", "author": "Robert C. Martin", "isbn": isbn, "category": "Software", "published_year": 2009}), 200)
 
+r2 = c.post("/api/books", headers=auth(admin_tok), json={"title": f"Design Patterns {run}", "author": "Gamma et al.",
+            "isbn": "9780201633610", "category": "software"})
+check("second book reuses the 'Software' category (case-insensitive FK)", r2, 201 if r2.status_code != 409 else 409)
+if r2.status_code == 201:
+    cats = {x["name"].lower(): x["book_count"] for x in c.get("/api/categories").json()}
+    check("category not duplicated", httpx.Response(200 if cats.get("software", 0) >= 2 else 500), 200)
+    c.delete(f"/api/books/{r2.json()['id']}", headers=auth(admin_tok))
+
 print("== Inventory service ==")
 check("copy for missing book -> 404", c.post("/api/inventory/copies", headers=auth(admin_tok), json={"book_id": 999999, "barcode": f"X-{run}"}), 404)
 copy = check("admin adds copy", c.post("/api/inventory/copies", headers=auth(admin_tok), json={"book_id": book_id, "barcode": f"BC-{run}", "shelf_location": "A1"}), 201).json()
 check("member cannot add copy -> 403", c.post("/api/inventory/copies", headers=auth(member_tok), json={"book_id": book_id, "barcode": "zzz"}), 403)
 check("admin lists copies", c.get("/api/inventory/copies", headers=auth(admin_tok), params={"book_id": book_id}), 200)
+check("admin gets one copy", c.get(f"/api/inventory/copies/{copy['id']}", headers=auth(admin_tok)), 200)
+spare = check("admin adds a spare copy", c.post("/api/inventory/copies", headers=auth(admin_tok), json={"book_id": book_id, "barcode": f"SP-{run}"}), 201).json()
+check("admin deletes the spare copy", c.delete(f"/api/inventory/copies/{spare['id']}", headers=auth(admin_tok)), 204)
 check("public availability", c.get(f"/api/inventory/availability/{book_id}"), 200)
 
 print("== Borrowing service (calls Member + Inventory) ==")
@@ -102,6 +118,7 @@ check("borrow same book again -> 409", c.post("/api/loans", headers=auth(member_
 check("admin cannot borrow -> 403", c.post("/api/loans", headers=auth(admin_tok), json={"book_id": book_id}), 403)
 av = c.get(f"/api/inventory/availability/{book_id}").json()
 print(f"    availability now: {av}")
+check("cannot delete a copy that is on loan -> 409", c.delete(f"/api/inventory/copies/{loan['copy_id']}", headers=auth(admin_tok)), 409)
 check("my loans", c.get("/api/loans/my", headers=auth(member_tok)), 200)
 check("admin lists loans", c.get("/api/loans", headers=auth(admin_tok), params={"status": "ACTIVE"}), 200)
 check("member lists all loans -> 403", c.get("/api/loans", headers=auth(member_tok)), 403)
@@ -116,7 +133,13 @@ fines = check("my fines", c.get("/api/fines/my", headers=auth(member_tok)), 200)
 check("my fine summary", c.get("/api/fines/my/summary", headers=auth(member_tok)), 200)
 check("admin lists fines", c.get("/api/fines", headers=auth(admin_tok)), 200)
 fid = fines["items"][0]["id"]
-check("member pays fine", c.post(f"/api/fines/{fid}/pay", headers=auth(member_tok)), 200)
+paid = check("member pays fine", c.post(f"/api/fines/{fid}/pay", headers=auth(member_tok)), 200).json()
+check("payment receipt created (Fine 1:N Payment)", httpx.Response(200 if len(paid.get("payments", [])) == 1 else 500), 200)
+check("get fine with receipts", c.get(f"/api/fines/{fid}", headers=auth(member_tok)), 200)
+check("paid fine cannot be deleted -> 409", c.delete(f"/api/fines/{fid}", headers=auth(admin_tok)), 409)
+extra = c.post("/api/fines", headers=auth(admin_tok), json={"user_id": member_id, "amount": 1.0, "reason": "Waive me please"}).json()
+check("member cannot waive a fine -> 403", c.delete(f"/api/fines/{extra['id']}", headers=auth(member_tok)), 403)
+check("admin waives an unpaid fine", c.delete(f"/api/fines/{extra['id']}", headers=auth(admin_tok)), 204)
 check("pay twice -> 409", c.post(f"/api/fines/{fid}/pay", headers=auth(member_tok)), 409)
 
 print("== Review service ==")

@@ -1,0 +1,57 @@
+# Failover test - one Catalog replica (catalog-2, port 8013) is stopped
+
+killed replica: True
+gateway health view: degraded (2/3 instances up)
+
+Gateway: http://127.0.0.1:8000   requests: 60   expected replicas: 2
+
+1) Sequential requests - answered by:
+   catalog-service/catalog-1          31  ####################
+   catalog-service/catalog-3          29  ###################
+[PASS] all requests succeeded  (status codes: {200: 60})
+[PASS] traffic reached 2 different replicas  (seen: 2)
+[PASS] distribution is even (difference between replicas <= 3 requests)
+
+2) 12 concurrent clients - answered by:
+   catalog-service/catalog-1          30
+   catalog-service/catalog-3          30
+[PASS] all concurrent requests succeeded
+[PASS] concurrent traffic reached 2 replicas
+
+3) Gateway counters for the catalog service (/lb/stats):
+   http://127.0.0.1:8003          status=up    requests=117  failures=0
+   http://127.0.0.1:8013          status=down  requests=56   failures=1
+   http://127.0.0.1:8023          status=up    requests=115  failures=0
+[PASS] /lb/stats lists every replica
+
+LOAD BALANCING VERIFIED
+
+## Other services that depend on Catalog (inventory->catalog, review->catalog) while the replica is down
+
+ALL CHECKS PASSED
+
+# Recovery - replica restarted, gateway cooldown (10 s) passed
+Gateway: http://127.0.0.1:8000   requests: 60   expected replicas: 3
+
+1) Sequential requests - answered by:
+   catalog-service/catalog-1          20  #############
+   catalog-service/catalog-2          20  #############
+   catalog-service/catalog-3          20  #############
+[PASS] all requests succeeded  (status codes: {200: 60})
+[PASS] traffic reached 3 different replicas  (seen: 3)
+[PASS] distribution is even (difference between replicas <= 2 requests)
+
+2) 12 concurrent clients - answered by:
+   catalog-service/catalog-1          20
+   catalog-service/catalog-2          20
+   catalog-service/catalog-3          20
+[PASS] all concurrent requests succeeded
+[PASS] concurrent traffic reached 3 replicas
+
+3) Gateway counters for the catalog service (/lb/stats):
+   http://127.0.0.1:8003          status=up    requests=163  failures=0
+   http://127.0.0.1:8013          status=up    requests=96   failures=1
+   http://127.0.0.1:8023          status=up    requests=161  failures=0
+[PASS] /lb/stats lists every replica
+
+LOAD BALANCING VERIFIED

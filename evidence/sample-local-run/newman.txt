@@ -1,0 +1,216 @@
+Smart Library - Microservices (via API Gateway)
+
+❏ 0 - Gateway health
+↳ Gateway health
+  GET http://127.0.0.1:8000/health [200 OK, 164B, 31ms]
+
+↳ All services health
+  GET http://127.0.0.1:8000/health/services [200 OK, 695B, 34ms]
+
+❏ 1 - Registration service
+↳ Register MEMBER
+  POST http://127.0.0.1:8000/api/auth/register [201 Created, 485B, 248ms]
+
+↳ Register ADMIN (needs X-Admin-Key)
+  POST http://127.0.0.1:8000/api/auth/register [201 Created, 487B, 232ms]
+
+↳ Register ADMIN without key (expect 403)
+  POST http://127.0.0.1:8000/api/auth/register [403 Forbidden, 417B, 10ms]
+
+↳ Check email availability
+  GET http://127.0.0.1:8000/api/auth/check-email?email=member@example.com [200 OK, 391B, 9ms]
+
+❏ 2 - Login service (JWT)
+↳ Login ADMIN
+  POST http://127.0.0.1:8000/api/auth/login [200 OK, 841B, 245ms]
+
+↳ Login MEMBER
+  POST http://127.0.0.1:8000/api/auth/login [200 OK, 836B, 231ms]
+
+↳ Who am I (MEMBER)
+  GET http://127.0.0.1:8000/api/auth/me [200 OK, 463B, 12ms]
+
+↳ Verify token (ADMIN)
+  GET http://127.0.0.1:8000/api/auth/verify [200 OK, 398B, 8ms]
+
+↳ Change password (MEMBER)
+  POST http://127.0.0.1:8000/api/auth/change-password [204 No Content, 319B, 500ms]
+
+↳ No token (expect 401)
+  GET http://127.0.0.1:8000/api/auth/me [401 Unauthorized, 195B, 3ms]
+
+❏ 3 - Member service (Member 1)
+↳ List members (ADMIN)
+  GET http://127.0.0.1:8000/api/members?page=1&page_size=20 [200 OK, 1.08kB, 16ms]
+
+↳ Member stats (ADMIN)
+  GET http://127.0.0.1:8000/api/members/stats [200 OK, 400B, 9ms]
+
+↳ Get my member record (MEMBER)
+  GET http://127.0.0.1:8000/api/members/4 [200 OK, 465B, 8ms]
+
+↳ Update my name (MEMBER)
+  PUT http://127.0.0.1:8000/api/members/4 [200 OK, 468B, 12ms]
+
+↳ List members as MEMBER (expect 403)
+  GET http://127.0.0.1:8000/api/members [403 Forbidden, 180B, 3ms]
+
+↳ Suspend member (ADMIN)
+  PATCH http://127.0.0.1:8000/api/members/4/status [200 OK, 471B, 12ms]
+
+↳ Login while suspended (expect 403)
+  POST http://127.0.0.1:8000/api/auth/login [403 Forbidden, 405B, 268ms]
+
+↳ Re-activate member (ADMIN)
+  PATCH http://127.0.0.1:8000/api/members/4/status [200 OK, 468B, 14ms]
+
+❏ 4 - Catalog service (Member 1)
+↳ Add book (ADMIN)
+  POST http://127.0.0.1:8000/api/books [201 Created, 610B, 20ms]
+
+↳ Search books (public)
+  GET http://127.0.0.1:8000/api/books?q=clean [200 OK, 649B, 10ms]
+
+↳ Get book (public)
+  GET http://127.0.0.1:8000/api/books/1 [200 OK, 603B, 10ms]
+
+↳ List categories (public)
+  GET http://127.0.0.1:8000/api/categories [200 OK, 363B, 10ms]
+
+↳ Update book (ADMIN)
+  PUT http://127.0.0.1:8000/api/books/1 [200 OK, 603B, 15ms]
+
+↳ Add book as MEMBER (expect 403)
+  POST http://127.0.0.1:8000/api/books [403 Forbidden, 180B, 3ms]
+
+↳ Add book with bad ISBN (expect 422)
+  POST http://127.0.0.1:8000/api/books [422 Unprocessable Entity, 501B, 8ms]
+
+❏ 5 - Inventory service (Member 2)
+↳ Add copy (ADMIN)
+  POST http://127.0.0.1:8000/api/inventory/copies [201 Created, 479B, 50ms]
+
+↳ List copies (ADMIN)
+  GET http://127.0.0.1:8000/api/inventory/copies?book_id=1 [200 OK, 648B, 9ms]
+
+↳ Get one copy (ADMIN)
+  GET http://127.0.0.1:8000/api/inventory/copies/2 [200 OK, 472B, 9ms]
+
+↳ Add spare copy (ADMIN)
+  POST http://127.0.0.1:8000/api/inventory/copies [201 Created, 476B, 49ms]
+
+↳ Delete spare copy (ADMIN)
+  DELETE http://127.0.0.1:8000/api/inventory/copies/3 [204 No Content, 325B, 12ms]
+
+↳ Availability (public)
+  GET http://127.0.0.1:8000/api/inventory/availability/1 [200 OK, 388B, 8ms]
+
+↳ Mark copy MAINTENANCE (ADMIN)
+  PATCH http://127.0.0.1:8000/api/inventory/copies/2/status [200 OK, 474B, 13ms]
+
+↳ Mark copy AVAILABLE (ADMIN)
+  PATCH http://127.0.0.1:8000/api/inventory/copies/2/status [200 OK, 472B, 11ms]
+
+↳ Add copy as MEMBER (expect 403)
+  POST http://127.0.0.1:8000/api/inventory/copies [403 Forbidden, 180B, 4ms]
+
+↳ Internal checkout via gateway (expect 403)
+  POST http://127.0.0.1:8000/api/inventory/internal/checkout [403 Forbidden, 200B, 2ms]
+
+❏ 6 - Borrowing service (Member 2)
+↳ Borrow book (MEMBER)
+  POST http://127.0.0.1:8000/api/loans [201 Created, 526B, 99ms]
+
+↳ Borrow same book again (expect 409)
+  POST http://127.0.0.1:8000/api/loans [409 Conflict, 392B, 49ms]
+
+↳ Availability after borrowing
+  GET http://127.0.0.1:8000/api/inventory/availability/1 [200 OK, 388B, 8ms]
+
+↳ My loans (MEMBER)
+  GET http://127.0.0.1:8000/api/loans/my [200 OK, 564B, 10ms]
+
+↳ Get loan
+  GET http://127.0.0.1:8000/api/loans/2 [200 OK, 518B, 14ms]
+
+↳ All loans (ADMIN)
+  GET http://127.0.0.1:8000/api/loans?status=ACTIVE [200 OK, 564B, 13ms]
+
+↳ Overdue loans (ADMIN)
+  GET http://127.0.0.1:8000/api/loans?overdue=true [200 OK, 384B, 17ms]
+
+↳ All loans as MEMBER (expect 403)
+  GET http://127.0.0.1:8000/api/loans [403 Forbidden, 180B, 3ms]
+
+↳ Return book (MEMBER)
+  POST http://127.0.0.1:8000/api/loans/2/return [200 OK, 546B, 69ms]
+
+❏ 7 - Fine service (Member 3)
+↳ Create manual fine (ADMIN)
+  POST http://127.0.0.1:8000/api/fines [201 Created, 488B, 14ms]
+
+↳ My fines (MEMBER)
+  GET http://127.0.0.1:8000/api/fines/my [200 OK, 528B, 12ms]
+
+↳ My fine summary (MEMBER)
+  GET http://127.0.0.1:8000/api/fines/my/summary [200 OK, 381B, 16ms]
+
+↳ All fines (ADMIN)
+  GET http://127.0.0.1:8000/api/fines?status=UNPAID [200 OK, 529B, 36ms]
+
+↳ Pay fine (MEMBER)
+  POST http://127.0.0.1:8000/api/fines/2/pay [200 OK, 604B, 19ms]
+
+↳ Get fine with payment receipt (MEMBER)
+  GET http://127.0.0.1:8000/api/fines/2 [200 OK, 602B, 9ms]
+
+↳ Create fine to waive (ADMIN)
+  POST http://127.0.0.1:8000/api/fines [201 Created, 484B, 13ms]
+
+↳ Waive (delete) unpaid fine (ADMIN)
+  DELETE http://127.0.0.1:8000/api/fines/3 [204 No Content, 315B, 18ms]
+
+↳ Delete a paid fine (expect 409)
+  DELETE http://127.0.0.1:8000/api/fines/2 [409 Conflict, 376B, 9ms]
+
+↳ Create fine as MEMBER (expect 403)
+  POST http://127.0.0.1:8000/api/fines [403 Forbidden, 180B, 3ms]
+
+❏ 8 - Review service (Member 3)
+↳ Review book (MEMBER)
+  POST http://127.0.0.1:8000/api/reviews [201 Created, 532B, 55ms]
+
+↳ List reviews of a book (public)
+  GET http://127.0.0.1:8000/api/reviews?book_id=1 [200 OK, 570B, 13ms]
+
+↳ Rating summary (public)
+  GET http://127.0.0.1:8000/api/reviews/summary/1 [200 OK, 429B, 9ms]
+
+↳ Edit my review (MEMBER)
+  PUT http://127.0.0.1:8000/api/reviews/1 [200 OK, 526B, 15ms]
+
+↳ Review as ADMIN (expect 403)
+  POST http://127.0.0.1:8000/api/reviews [403 Forbidden, 397B, 8ms]
+
+↳ Delete review (ADMIN moderation)
+  DELETE http://127.0.0.1:8000/api/reviews/1 [204 No Content, 319B, 13ms]
+
+┌─────────────────────────┬───────────────────┬──────────────────┐
+│                         │          executed │           failed │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│              iterations │                 1 │                0 │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│                requests │                62 │                0 │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│            test-scripts │                11 │                0 │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│      prerequest-scripts │                 0 │                0 │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│              assertions │                 0 │                0 │
+├─────────────────────────┴───────────────────┴──────────────────┤
+│ total run duration: 3.5s                                       │
+├────────────────────────────────────────────────────────────────┤
+│ total data received: 9.65kB (approx)                           │
+├────────────────────────────────────────────────────────────────┤
+│ average response time: 43ms [min: 2ms, max: 500ms, s.d.: 86ms] │
+└────────────────────────────────────────────────────────────────┘

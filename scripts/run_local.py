@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run all 9 services on localhost with SQLite - no Docker, no PostgreSQL needed.
+"""Run all 9 services (Catalog as 3 replicas = 11 processes) on localhost with SQLite - no Docker, no PostgreSQL needed.
 
     pip install -r requirements-dev.txt
     python scripts/run_local.py          # gateway on http://localhost:8000
@@ -17,17 +17,19 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / ".local-data"
 DATA.mkdir(exist_ok=True)
 
-# service folder -> (port, database file)
+# label -> (service folder, port, database file).  The Catalog service runs as 3 replicas (load balancing demo).
 SERVICES = {
-    "registration-service": (8001, "auth.db"),
-    "login-service": (8002, "auth.db"),          # same auth database as registration + member
-    "catalog-service": (8003, "catalog.db"),
-    "member-service": (8004, "auth.db"),
-    "inventory-service": (8005, "inventory.db"),
-    "borrowing-service": (8006, "borrowing.db"),
-    "fine-service": (8007, "fine.db"),
-    "review-service": (8008, "review.db"),
-    "gateway": (8000, None),
+    "registration-service": ("registration-service", 8001, "auth.db"),
+    "login-service": ("login-service", 8002, "auth.db"),          # same auth database as registration + member
+    "catalog-1": ("catalog-service", 8003, "catalog.db"),
+    "catalog-2": ("catalog-service", 8013, "catalog.db"),
+    "catalog-3": ("catalog-service", 8023, "catalog.db"),
+    "member-service": ("member-service", 8004, "auth.db"),
+    "inventory-service": ("inventory-service", 8005, "inventory.db"),
+    "borrowing-service": ("borrowing-service", 8006, "borrowing.db"),
+    "fine-service": ("fine-service", 8007, "fine.db"),
+    "review-service": ("review-service", 8008, "review.db"),
+    "gateway": ("gateway", 8000, None),
 }
 
 env_base = {
@@ -36,7 +38,7 @@ env_base = {
     "INTERNAL_API_KEY": os.environ.get("INTERNAL_API_KEY", "local-internal-key-0123456789"),
     "ADMIN_REGISTRATION_KEY": os.environ.get("ADMIN_REGISTRATION_KEY", "local-admin-key"),
     "REGISTRATION_URL": "http://127.0.0.1:8001", "LOGIN_URL": "http://127.0.0.1:8002",
-    "CATALOG_URL": "http://127.0.0.1:8003", "MEMBER_URL": "http://127.0.0.1:8004",
+    "CATALOG_URL": "http://127.0.0.1:8003,http://127.0.0.1:8013,http://127.0.0.1:8023", "MEMBER_URL": "http://127.0.0.1:8004",
     "INVENTORY_URL": "http://127.0.0.1:8005", "BORROWING_URL": "http://127.0.0.1:8006",
     "FINE_URL": "http://127.0.0.1:8007", "REVIEW_URL": "http://127.0.0.1:8008",
 }
@@ -53,20 +55,25 @@ def stop(*_):
 signal.signal(signal.SIGINT, stop)
 signal.signal(signal.SIGTERM, stop)
 
-for name, (port, db) in SERVICES.items():
-    env = dict(env_base)
+for label, (folder, port, db) in SERVICES.items():
+    env = dict(env_base, INSTANCE_ID=label)
     if db:
         env["DATABASE_URL"] = f"sqlite:///{DATA / db}"
     procs.append(subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", str(port),
          "--log-level", "warning"],
-        cwd=ROOT / "services" / name, env=env))
-    print(f"started {name:22s} http://127.0.0.1:{port}")
+        cwd=ROOT / "services" / folder, env=env))
+    print(f"started {label:22s} http://127.0.0.1:{port}")
 
 print("\nGateway: http://127.0.0.1:8000   (docs: /docs, service status: /health/services)")
 print("Admin sign-up key for local runs: X-Admin-Key: " + env_base["ADMIN_REGISTRATION_KEY"])
+reported: set[int] = set()
 while True:
     time.sleep(1)
-    if any(p.poll() is not None for p in procs):
-        print("A service exited - stopping all.")
-        stop()
+    for p in procs:
+        if p.poll() is not None and p.pid not in reported:
+            reported.add(p.pid)
+            print(f"WARNING: a service process (pid {p.pid}) exited with code {p.returncode} - the others keep running.")
+    if all(p.poll() is not None for p in procs):
+        print("All services exited.")
+        sys.exit(0)
