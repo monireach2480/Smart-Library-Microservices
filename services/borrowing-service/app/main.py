@@ -2,8 +2,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.database import init_db
-from app.routes import router
+from app.core.database import init_db
+from app.core.observability import INSTANCE_ID, install
+from app.routers import router
 
 
 @asynccontextmanager
@@ -13,9 +14,10 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Borrowing Service", version="1.0.0", lifespan=lifespan)
+install(app, "borrowing-service")
 app.include_router(router)
 
 
 @app.get("/health", tags=["ops"])
 def health():
-    return {"status": "ok", "service": "borrowing-service"}
+    return {"status": "ok", "service": "borrowing-service", "instance": INSTANCE_ID}

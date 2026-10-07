@@ -6,7 +6,7 @@
 | Service | Port | DB | Endpoints |
 |---|---|---|---|
 | registration-service | 8001 | auth_db | `POST /register`, `GET /check-email` |
-| inventory-service | 8005 | inventory_db | `POST/GET /inventory/copies`, `PATCH /inventory/copies/{id}/status`, `GET /inventory/availability/{book_id}` (+ internal checkout/return) |
+| inventory-service | 8005 | inventory_db | `POST/GET /inventory/copies`, `GET/DELETE /inventory/copies/{id}`, `PATCH /inventory/copies/{id}/status`, `GET /inventory/availability/{book_id}` (+ internal checkout/return) |
 | borrowing-service | 8006 | borrowing_db | `POST /loans`, `GET /loans`, `GET /loans/my`, `GET /loans/{id}`, `POST /loans/{id}/return` |
 
 Your services call: Catalog (Member 1), Member (Member 1), Fine (Member 3).
