@@ -1,19 +1,39 @@
-# All 9 services + PostgreSQL on ONE machine - for development / a quick demo.
-# For the real deployment (one compose file per EC2 instance) see deploy/.
-#   cp .env.example .env   (fill it in)   &&   docker compose up --build
+# Smart Library - ALL services + PostgreSQL on one machine (development / quick demo).
+# The real deployment uses one compose file per EC2 instance: see deploy/.
+#
+#   cp .env.example .env        (fill it in)
+#   docker compose up --build   (gateway: http://localhost:8000)
+#   docker compose -f docker-compose.yml -f docker-compose.debug.yml up --build   (also publishes every service port)
+name: smart-library
+
 x-env: &common-env
   SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env (at least 32 characters)}
   INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Set INTERNAL_API_KEY in .env}
   ADMIN_REGISTRATION_KEY: ${ADMIN_REGISTRATION_KEY:?Set ADMIN_REGISTRATION_KEY in .env}
 
-x-db: &db-wait
+# Catalog runs as 3 replicas; the gateway (and every service that calls Catalog) round-robins over them.
+x-catalog-urls: &catalog-urls "http://catalog-service-1:8003,http://catalog-service-2:8003,http://catalog-service-3:8003"
+
+# Shared settings of every application container: restart policy + networks + wait for a healthy database.
+x-app: &app
+  restart: unless-stopped
+  networks: [backend, db]
   depends_on:
     postgres:
       condition: service_healthy
 
+networks:
+  backend:      # service <-> service traffic; only the gateway publishes a port to the host
+  db:           # PostgreSQL is reachable only from services that need a database (not from the gateway)
+
+volumes:
+  pgdata:
+
 services:
   postgres:
-    image: postgres:16
+    image: postgres:16-alpine
+    restart: unless-stopped
+    networks: [db]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-library}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -25,77 +45,92 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
-    ports:
-      - "127.0.0.1:5432:5432"
 
   gateway:
     build: ./services/gateway
-    environment: *common-env
+    restart: unless-stopped
+    networks: [backend]
+    environment:
+      <<: *common-env
+      CATALOG_URL: *catalog-urls
     ports: ["8000:8000"]
+    depends_on:
+      registration-service: {condition: service_healthy}
+      login-service: {condition: service_healthy}
+      catalog-service-1: {condition: service_healthy}
+      catalog-service-2: {condition: service_healthy}
+      catalog-service-3: {condition: service_healthy}
+      member-service: {condition: service_healthy}
+      inventory-service: {condition: service_healthy}
+      borrowing-service: {condition: service_healthy}
+      fine-service: {condition: service_healthy}
+      review-service: {condition: service_healthy}
 
   registration-service:
+    <<: *app
     build: ./services/registration-service
-    <<: *db-wait
     environment:
       <<: *common-env
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/auth_db
-    ports: ["8001:8001"]
 
   login-service:
+    <<: *app
     build: ./services/login-service
-    <<: *db-wait
     environment:
       <<: *common-env
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/auth_db
-    ports: ["8002:8002"]
 
-  catalog-service:
+  catalog-service-1: &catalog
+    <<: *app
     build: ./services/catalog-service
-    <<: *db-wait
-    environment:
+    environment: &catalog-env
       <<: *common-env
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/catalog_db
-    ports: ["8003:8003"]
+      INSTANCE_ID: catalog-1
+  catalog-service-2:
+    <<: *catalog
+    environment:
+      <<: *catalog-env
+      INSTANCE_ID: catalog-2
+  catalog-service-3:
+    <<: *catalog
+    environment:
+      <<: *catalog-env
+      INSTANCE_ID: catalog-3
 
   member-service:
+    <<: *app
     build: ./services/member-service
-    <<: *db-wait
     environment:
       <<: *common-env
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/auth_db
-    ports: ["8004:8004"]
 
   inventory-service:
+    <<: *app
     build: ./services/inventory-service
-    <<: *db-wait
     environment:
       <<: *common-env
+      CATALOG_URL: *catalog-urls
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/inventory_db
-    ports: ["8005:8005"]
 
   borrowing-service:
+    <<: *app
     build: ./services/borrowing-service
-    <<: *db-wait
     environment:
       <<: *common-env
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/borrowing_db
-    ports: ["8006:8006"]
 
   fine-service:
+    <<: *app
     build: ./services/fine-service
-    <<: *db-wait
     environment:
       <<: *common-env
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/fine_db
-    ports: ["8007:8007"]
 
   review-service:
+    <<: *app
     build: ./services/review-service
-    <<: *db-wait
     environment:
       <<: *common-env
+      CATALOG_URL: *catalog-urls
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-library}:${POSTGRES_PASSWORD}@postgres:5432/review_db
-    ports: ["8008:8008"]
-
-volumes:
-  pgdata:

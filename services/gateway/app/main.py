@@ -1,22 +1,26 @@
 """API Gateway: the single public entry point.
 
 * routes /api/... to the right microservice
+* load-balances (round-robin + failover) across the replicas of a service
 * verifies the JWT and enforces coarse role rules before forwarding
 * blocks every /internal endpoint from the outside
 """
 import asyncio
 import os
 import re
+import uuid
 from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
-from app.security import ADMIN, decode_token
+from app.core.balancer import UpstreamPool
+from app.core.security import ADMIN, decode_token
 
-# ---- where each microservice lives (set these to the EC2 private IPs in production) ----
-SERVICES: dict[str, str] = {
+# ---- where each microservice lives. A value may list several replicas, comma-separated:
+#      CATALOG_URL=http://10.0.0.5:8003,http://10.0.0.5:8013,http://10.0.0.5:8023 ----
+SERVICE_URLS: dict[str, str] = {
     "registration": os.environ.get("REGISTRATION_URL", "http://registration-service:8001"),
     "login": os.environ.get("LOGIN_URL", "http://login-service:8002"),
     "catalog": os.environ.get("CATALOG_URL", "http://catalog-service:8003"),
@@ -62,6 +66,9 @@ POLICY: list[tuple[set[str], str, str]] = [
     (ANY, r"^/api/fines/?$", "admin"),
 ]
 
+POOLS: dict[str, UpstreamPool] = {name: UpstreamPool(urls) for name, urls in SERVICE_URLS.items()}
+IDEMPOTENT = {"GET", "HEAD", "OPTIONS"}
+
 HOP_BY_HOP = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailers",
               "transfer-encoding", "upgrade", "host", "content-length", "content-encoding"}
 
@@ -102,16 +109,36 @@ def health():
 
 @app.get("/health/services", tags=["ops"])
 async def services_health(request: Request):
-    """Pings every downstream microservice."""
+    """Pings every instance of every downstream microservice."""
     async def ping(name: str, url: str):
         try:
             r = await request.app.state.http.get(f"{url}/health", timeout=3.0)
-            return name, ("up" if r.status_code == 200 else f"http {r.status_code}")
+            return name, url, ("up" if r.status_code == 200 else f"http {r.status_code}")
         except httpx.HTTPError:
-            return name, "down"
+            return name, url, "down"
 
-    results = dict(await asyncio.gather(*(ping(n, u) for n, u in SERVICES.items())))
-    return {"gateway": "up", "services": results}
+    checks = await asyncio.gather(*(ping(n, u) for n, p in POOLS.items() for u in p.urls))
+    instances: dict[str, dict[str, str]] = {n: {} for n in POOLS}
+    for name, url, state in checks:
+        instances[name][url] = state
+    summary = {}
+    for name, states in instances.items():
+        up = sum(1 for v in states.values() if v == "up")
+        summary[name] = "up" if up == len(states) and up == 1 else (
+            f"up ({up}/{len(states)} instances)" if up == len(states) else
+            ("down" if up == 0 else f"degraded ({up}/{len(states)} instances up)"))
+    return {"gateway": "up", "services": summary, "instances": instances}
+
+
+@app.get("/lb/stats", tags=["ops"])
+async def lb_stats(request: Request):
+    """ADMIN only: how many requests the gateway sent to each instance (evidence of load balancing)."""
+    auth = request.headers.get("authorization", "")
+    if not auth.lower().startswith("bearer ") or not auth[7:].strip():
+        raise HTTPException(401, "Missing bearer token.", headers={"WWW-Authenticate": "Bearer"})
+    if decode_token(auth[7:].strip()).role != ADMIN:
+        raise HTTPException(403, "This route requires the ADMIN role.")
+    return {name: pool.snapshot() for name, pool in POOLS.items()}
 
 
 @app.api_route("/api/{rest:path}", methods=sorted(ANY), tags=["proxy"], include_in_schema=False)
@@ -142,15 +169,36 @@ async def proxy(request: Request, rest: str):
     client_ip = request.client.host if request.client else ""
     headers["x-forwarded-for"] = (request.headers.get("x-forwarded-for", "") + ", " + client_ip).strip(", ")
 
-    try:
-        upstream = await request.app.state.http.request(
-            method, SERVICES[service] + upstream_path, params=request.query_params,
-            content=await request.body(), headers=headers,
-        )
-    except httpx.TimeoutException:
-        return JSONResponse({"detail": f"{service} service timed out."}, status_code=504)
-    except httpx.HTTPError:
-        return JSONResponse({"detail": f"{service} service is unavailable."}, status_code=502)
+    request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
+    headers["x-request-id"] = request_id
+    body = await request.body()
+    pool = POOLS[service]
+    upstream, used, failure = None, None, None
+    for base in pool.candidates():
+        try:
+            upstream = await request.app.state.http.request(
+                method, base + upstream_path, params=request.query_params, content=body, headers=headers)
+            used = base
+            break
+        except (httpx.ConnectError, httpx.ConnectTimeout):
+            pool.mark_down(base)           # never reached the instance: safe to retry on another one
+            failure = 502
+        except httpx.TimeoutException:
+            pool.mark_down(base)
+            failure = 504
+            if method not in IDEMPOTENT:
+                break                      # it may have been processed: do not repeat a write
+        except httpx.HTTPError:
+            pool.mark_down(base)
+            failure = 502
+            if method not in IDEMPOTENT:
+                break
+    if upstream is None:
+        detail = f"{service} service timed out." if failure == 504 else f"{service} service is unavailable."
+        return JSONResponse({"detail": detail}, status_code=failure or 502, headers={"X-Request-ID": request_id})
+    pool.record(used)
 
     out_headers = {k: v for k, v in upstream.headers.items() if k.lower() not in HOP_BY_HOP}
+    out_headers["X-Upstream"] = used            # which instance the gateway chose
+    out_headers["X-Request-ID"] = request_id
     return Response(content=upstream.content, status_code=upstream.status_code, headers=out_headers)

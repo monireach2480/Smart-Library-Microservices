@@ -24,7 +24,8 @@ services:
       SECRET_KEY: ${SECRET_KEY:?set in .env}
       REGISTRATION_URL: http://registration-service:8001
       LOGIN_URL: http://login-service:8002
-      CATALOG_URL: http://${EC2_2_IP:?set in .env}:8003
+      # Catalog runs as 3 replicas on EC2 #2 - the gateway load-balances across them
+      CATALOG_URL: http://${EC2_2_IP:?set in .env}:8003,http://${EC2_2_IP}:8013,http://${EC2_2_IP}:8023
       MEMBER_URL: http://${EC2_2_IP}:8004
       INVENTORY_URL: http://${EC2_3_IP:?set in .env}:8005
       BORROWING_URL: http://${EC2_3_IP}:8006

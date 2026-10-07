@@ -1,0 +1,24 @@
+Gateway: http://127.0.0.1:8000   requests: 60   expected replicas: 3
+
+1) Sequential requests - answered by:
+   catalog-service/catalog-1          20  #############
+   catalog-service/catalog-2          20  #############
+   catalog-service/catalog-3          20  #############
+[PASS] all requests succeeded  (status codes: {200: 60})
+[PASS] traffic reached 3 different replicas  (seen: 3)
+[PASS] distribution is even (difference between replicas <= 2 requests)
+
+2) 12 concurrent clients - answered by:
+   catalog-service/catalog-1          20
+   catalog-service/catalog-2          20
+   catalog-service/catalog-3          20
+[PASS] all concurrent requests succeeded
+[PASS] concurrent traffic reached 3 replicas
+
+3) Gateway counters for the catalog service (/lb/stats):
+   http://127.0.0.1:8003          status=up    requests=44   failures=0
+   http://127.0.0.1:8013          status=up    requests=44   failures=0
+   http://127.0.0.1:8023          status=up    requests=43   failures=0
+[PASS] /lb/stats lists every replica
+
+LOAD BALANCING VERIFIED

@@ -42,6 +42,8 @@ Each service also serves interactive docs on its own port at `/docs` (when its p
 |---|---|---|---|
 | POST | `/api/inventory/copies` | ADMIN | Register a physical copy (book must exist in Catalog) |
 | GET | `/api/inventory/copies?book_id=&status=` | ADMIN | List copies |
+| GET | `/api/inventory/copies/{id}` | ADMIN | One copy |
+| DELETE | `/api/inventory/copies/{id}` | ADMIN | Remove a copy (409 while it is on loan) |
 | PATCH | `/api/inventory/copies/{id}/status` | ADMIN | `AVAILABLE` / `BORROWED` / `LOST` / `MAINTENANCE` |
 | GET | `/api/inventory/availability/{book_id}` | public | Total vs. available copies |
 
@@ -61,7 +63,9 @@ Each service also serves interactive docs on its own port at `/docs` (when its p
 | GET | `/api/fines/my/summary` | any | Unpaid / paid totals |
 | GET | `/api/fines?status=&user_id=` | ADMIN | All fines |
 | POST | `/api/fines` | ADMIN | Manual fine `{user_id,amount,reason}` |
-| POST | `/api/fines/{id}/pay` | owner/ADMIN | Mark as paid |
+| GET | `/api/fines/{id}` | owner/ADMIN | One fine with its payment receipts |
+| POST | `/api/fines/{id}/pay` | owner/ADMIN | Pay: marks it PAID and creates a receipt |
+| DELETE | `/api/fines/{id}` | ADMIN | Waive an unpaid fine (409 if paid) |
 
 ## Review service (Member 3)
 | Method | Path | Auth | Description |
@@ -76,6 +80,15 @@ Each service also serves interactive docs on its own port at `/docs` (when its p
 | Method | Path | Description |
 |---|---|---|
 | GET | `/health` | Gateway status |
-| GET | `/health/services` | Reachability of all 8 downstream services |
+| GET | `/health/services` | Status of every instance of every downstream service (e.g. `catalog: up (3/3 instances)`) |
+| GET | `/lb/stats` | ADMIN – requests and failures the gateway recorded per instance |
+
+### Response headers added for traceability
+| Header | Set by | Meaning |
+|---|---|---|
+| `X-Served-By` | each service | `<service>/<instance>` – which replica handled the request |
+| `X-Upstream` | gateway | the instance URL the gateway chose |
+| `X-Request-ID` | gateway | id for tracing a request (client may supply its own) |
+| `X-Response-Time-ms` | each service | time spent in the service |
 
 Anything containing `/internal` is refused by the gateway (403): those endpoints exist only for service-to-service calls.

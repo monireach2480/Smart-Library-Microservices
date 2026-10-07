@@ -3,7 +3,7 @@
 | Instance | Folder | Runs | Size (suggested) |
 |---|---|---|---|
 | **EC2 #1** | `deploy/ec2-1-gateway-auth` | Gateway, Registration, Login, **PostgreSQL** | t3.small |
-| **EC2 #2** | `deploy/ec2-2-member1` | Catalog, Member | t3.micro |
+| **EC2 #2** | `deploy/ec2-2-member1` | Catalog (**3 replicas**), Member | t3.small |
 | **EC2 #3** | `deploy/ec2-3-member2` | Inventory, Borrowing | t3.micro |
 | **EC2 #4** | `deploy/ec2-4-member3` | Fine, Review | t3.micro |
 
@@ -17,8 +17,8 @@
 |---|---|---|
 | 22 | your IP | SSH |
 | 8000 | `0.0.0.0/0` | API Gateway (EC2 #1 only matters) |
-| 5432, 8001–8008 | `library-sg` itself | instances talk to each other privately |
-| 8001–8008 | *your IP* (optional, temporary) | to demo a single service directly in Postman |
+| 5432, 8001–8008, 8013, 8023 | `library-sg` itself | instances talk to each other privately (8013 and 8023 are the 2nd and 3rd Catalog replica) |
+| 8001–8008, 8013, 8023 | *your IP* (optional, temporary) | to demo a single service or replica directly in Postman |
 
 * Note the **private IPv4** of every instance (EC2 console → instance → *Private IPv4 address*) and the **public IP** of EC2 #1.
 
@@ -58,9 +58,21 @@ python tests/smoke_test.py http://<EC2-1 public IP>:8000 --admin-key <ADMIN_REGI
 ```
 Then import the Postman collection and set `baseUrl = http://<EC2-1 public IP>:8000`.
 
+## 6. Verify load balancing
+```bash
+python tests/load_balancer_test.py http://<EC2-1 public IP>:8000 --admin-key <ADMIN_REGISTRATION_KEY>
+```
+Expected: the 3 Catalog replicas on EC2 #2 each serve ~1/3 of the requests. Failover demo: on EC2 #2 run `docker compose stop catalog-service-2`, repeat the test with `--expect 2`, then `docker compose start catalog-service-2`. Details: [LOAD_BALANCING.md](LOAD_BALANCING.md).
+
+## 7. Save evidence
+```bash
+python scripts/collect_evidence.py http://<EC2-1 public IP>:8000 --admin-key <ADMIN_REGISTRATION_KEY>
+```
+
 ## Troubleshooting
 * `"<name> service is unavailable"` from the gateway → wrong private IP in EC2 #1's `.env`, or the security group does not allow the port from `library-sg`. Fix the `.env`, then `docker compose up -d` again.
 * A service restarts in a loop with a connection error → PostgreSQL on EC2 #1 is not reachable: check `DB_HOST`, port 5432 in the security group, and the password.
+* Replica not receiving traffic → `/health/services` on the gateway shows which instance is `down`; check port 8013 / 8023 in the security group.
 * `401 Invalid token` on one service only → `SECRET_KEY` differs on that instance.
 * `403 Internal endpoint` between services → `INTERNAL_API_KEY` differs.
 * Logs: `docker compose logs -f <service-name>`.
