@@ -1,8 +1,0 @@
-# Namespace that holds every Smart Library object.
-#   kubectl apply -f k8s/
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: smart-library
-  labels:
-    app.kubernetes.io/part-of: smart-library
