@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 820" width="1200" height="820">
+<defs><marker id="a" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#374151"/></marker></defs>
+<rect x="0" y="0" width="1200" height="820" rx="0" fill="#ffffff" stroke="#ffffff" stroke-width="0"/>
+<text x="600.0" y="34" font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="700" fill="#1f2937" text-anchor="middle">Smart Library - Microservice Architecture</text>
+<rect x="480" y="56" width="240" height="46" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
+<text x="600.0" y="76.0" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#1f2937" text-anchor="middle">Postman / API client</text>
+<text x="600.0" y="94.0" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="normal" fill="#4b5563" text-anchor="middle">JWT in Authorization header</text>
+<line x1="600" y1="102" x2="600" y2="150" stroke="#374151" stroke-width="2" marker-end="url(#a)"/>
+<text x="612" y="130" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="normal" fill="#065f46" text-anchor="start">HTTP :8000  (the only public port)</text>
+<rect x="40" y="150" width="1120" height="215" rx="14" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="60" y="176" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" fill="#334155" text-anchor="start">EC2 #1  -  Gateway + common services + database</text>
+<rect x="70" y="192" width="330" height="150" rx="10" fill="#fff7ed" stroke="#f97316" stroke-width="1.5"/>
+<text x="235" y="218" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#1f2937" text-anchor="middle">API Gateway :8000</text>
+<text x="235" y="250" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="normal" fill="#7c2d12" text-anchor="middle">verifies JWT - enforces ADMIN / MEMBER rules</text>
+<text x="235" y="270" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="normal" fill="#7c2d12" text-anchor="middle">blocks /internal/* - adds X-Request-ID</text>
+<text x="235" y="292" font-family="Segoe UI,Arial,sans-serif" font-size="12.5" font-weight="700" fill="#c2410c" text-anchor="middle">LOAD BALANCER: round-robin + failover</text>
+<text x="235" y="312" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="normal" fill="#7c2d12" text-anchor="middle">across the replicas of each service</text>
+<rect x="430" y="192" width="210" height="66" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+<text x="535.0" y="222.0" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#1f2937" text-anchor="middle">Registration :8001</text>
+<text x="535.0" y="240.0" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="normal" fill="#4b5563" text-anchor="middle">POST /register</text>
+<rect x="430" y="276" width="210" height="66" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+<text x="535.0" y="306.0" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#1f2937" text-anchor="middle">Login :8002</text>
+<text x="535.0" y="324.0" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="normal" fill="#4b5563" text-anchor="middle">issues signed JWT</text>
+<rect x="680" y="192" width="450" height="150" rx="10" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5"/>
+<text x="905" y="218" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" fill="#166534" text-anchor="middle">PostgreSQL 16  (private network only)</text>
+<text x="700" y="243" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="600" fill="#166534" text-anchor="start">auth_db</text>
+<text x="800" y="243" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="normal" fill="#374151" text-anchor="start">- registration, login, member</text>
+<text x="700" y="259" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="600" fill="#166534" text-anchor="start">catalog_db</text>
+<text x="800" y="259" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="normal" fill="#374151" text-anchor="start">- catalog (3 replicas)</text>
+<text x="700" y="275" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="600" fill="#166534" text-anchor="start">inventory_db</text>
+<text x="800" y="275" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="normal" fill="#374151" text-anchor="start">- inventory</text>
+<text x="700" y="291" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="600" fill="#166534" text-anchor="start">borrowing_db</text>
+<text x="800" y="291" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="normal" fill="#374151" text-anchor="start">- borrowing</text>
+<text x="700" y="307" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="600" fill="#166534" text-anchor="start">fine_db</text>
+<text x="800" y="307" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="normal" fill="#374151" text-anchor="start">- fine</text>
+<text x="700" y="323" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="600" fill="#166534" text-anchor="start">review_db</text>
+<text x="800" y="323" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="normal" fill="#374151" text-anchor="start">- review</text>
+<line x1="640" y1="225" x2="680" y2="225" stroke="#22c55e" stroke-width="1.5" marker-end="url(#a)"/>
+<line x1="640" y1="309" x2="680" y2="309" stroke="#22c55e" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="40" y="420" width="360" height="330" rx="14" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="58" y="446" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" fill="#334155" text-anchor="start">EC2 #2  -  Member 1</text>
+<rect x="420" y="420" width="360" height="330" rx="14" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="438" y="446" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" fill="#334155" text-anchor="start">EC2 #3  -  Member 2</text>
+<rect x="800" y="420" width="360" height="330" rx="14" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="818" y="446" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" fill="#334155" text-anchor="start">EC2 #4  -  Member 3</text>
+<rect x="60" y="462" width="320" height="42" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
+<text x="220.0" y="488.0" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#1f2937" text-anchor="middle">Catalog replica 1  :8003</text>
+<rect x="60" y="512" width="320" height="42" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
+<text x="220.0" y="538.0" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#1f2937" text-anchor="middle">Catalog replica 2  :8013</text>
+<rect x="60" y="562" width="320" height="42" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
+<text x="220.0" y="588.0" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#1f2937" text-anchor="middle">Catalog replica 3  :8023</text>
+<text x="220" y="622" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="normal" fill="#1d4ed8" text-anchor="middle">3 replicas - same catalog_db - X-Served-By header</text>
+<rect x="60" y="640" width="320" height="56" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+<text x="220.0" y="665.0" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#1f2937" text-anchor="middle">Member :8004</text>
+<text x="220.0" y="683.0" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="normal" fill="#4b5563" text-anchor="middle">list - stats - suspend / activate</text>
+<rect x="440" y="470" width="320" height="86" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+<text x="600.0" y="510.0" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#1f2937" text-anchor="middle">Inventory :8005</text>
+<text x="600.0" y="528.0" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="normal" fill="#4b5563" text-anchor="middle">book copies - availability</text>
+<rect x="440" y="590" width="320" height="86" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+<text x="600.0" y="630.0" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#1f2937" text-anchor="middle">Borrowing :8006</text>
+<text x="600.0" y="648.0" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="normal" fill="#4b5563" text-anchor="middle">loans - returns - overdue detection</text>
+<line x1="600" y1="590" x2="600" y2="558" stroke="#6b7280" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#a)"/>
+<rect x="820" y="470" width="320" height="86" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+<text x="980.0" y="510.0" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#1f2937" text-anchor="middle">Fine :8007</text>
+<text x="980.0" y="528.0" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="normal" fill="#4b5563" text-anchor="middle">late fees - payments (receipts)</text>
+<rect x="820" y="590" width="320" height="86" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+<text x="980.0" y="630.0" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#1f2937" text-anchor="middle">Review :8008</text>
+<text x="980.0" y="648.0" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="normal" fill="#4b5563" text-anchor="middle">ratings and reviews</text>
+<line x1="235" y1="342" x2="220" y2="420" stroke="#374151" stroke-width="2" marker-end="url(#a)"/>
+<line x1="235" y1="342" x2="600" y2="420" stroke="#374151" stroke-width="2" marker-end="url(#a)"/>
+<line x1="235" y1="342" x2="980" y2="420" stroke="#374151" stroke-width="2" marker-end="url(#a)"/>
+<text x="205" y="404" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="normal" fill="#c2410c" text-anchor="end">round-robin over 3 replicas</text>
+<line x1="440" y1="630" x2="380" y2="668" stroke="#6b7280" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#a)"/>
+<line x1="760" y1="630" x2="820" y2="520" stroke="#6b7280" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#a)"/>
+<line x1="440" y1="500" x2="380" y2="500" stroke="#6b7280" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#a)"/>
+<polyline points="820,608 790,573 392,573" fill="none" stroke="#6b7280" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#a)"/>
+<rect x="40" y="770" width="1120" height="38" rx="8" fill="#fffbeb" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="60" y="794" font-family="Segoe UI,Arial,sans-serif" font-size="11.5" font-weight="normal" fill="#92400e" text-anchor="start">Dashed arrows = service-to-service calls (X-Internal-Key): borrowing>member, borrowing>inventory, borrowing>fine, inventory>catalog, review>catalog</text>
+</svg>
