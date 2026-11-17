@@ -1,6 +1,11 @@
 # Smart Library – Microservices Backend
 
-A backend-only library management system built as **9 microservices** (FastAPI · PostgreSQL · JWT · Docker), with an **API Gateway that load-balances** replicated services, deployed on **4 EC2 instances** and tested with Postman. Team of 3.
+A backend-only library management system built as **9 microservices** (FastAPI · PostgreSQL · JWT · Docker), with an **API Gateway that load-balances** replicated services and tested with Postman. Team of 3.
+
+Two deployment targets, both from the same images:
+
+* **Kubernetes** (Minikube or EC2) — YAML only, fanout DNS on `aupp.com`, a cloud PostgreSQL database, and a shared ReadWriteMany log volume. Start at **[docs/KUBERNETES.md](docs/KUBERNETES.md)**.
+* **Docker Compose** — 4 EC2 instances, or all-in-one locally for development. See below.
 
 ![Architecture](docs/architecture.png)
 *(vector version: [docs/architecture.svg](docs/architecture.svg))*
@@ -9,6 +14,9 @@ A backend-only library management system built as **9 microservices** (FastAPI �
 
 | Topic | Where |
 |---|---|
+| **Kubernetes deployment** (Minikube, fanout DNS, shared volume) | [docs/KUBERNETES.md](docs/KUBERNETES.md) · `k8s/` |
+| **Project guidelines → where each is met** | [docs/RUBRIC_MAPPING.md](docs/RUBRIC_MAPPING.md) |
+| Cloud database setup (Neon / RDS) | [deploy/cloud-db/README.md](deploy/cloud-db/README.md) |
 | Microservices, Docker, Compose | this README, `services/*/Dockerfile`, `docker-compose.yml`, `deploy/` |
 | JWT, gateway, roles (RBAC) | [docs/SECURITY_RBAC.md](docs/SECURITY_RBAC.md) |
 | Database schema, relationships, CRUD | [docs/DATABASE.md](docs/DATABASE.md) |

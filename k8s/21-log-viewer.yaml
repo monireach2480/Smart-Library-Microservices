@@ -1,0 +1,73 @@
+# Log Viewer - a SEPARATE Pod that mounts the same PersistentVolumeClaim read-only and serves the
+# shared log directory over HTTP at http://logs.aupp.com/ (see 30-ingress.yaml).
+#
+# This is the second half of the guideline 6 demonstration: the file is written by the 11 application
+# containers in other Pods, and read here by a container that shares nothing with them except the
+# volume. It is an operations endpoint, not a microservice - no client API traffic passes through it,
+# so routing to it from the Ingress does not conflict with guideline 3.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: log-viewer
+  namespace: smart-library
+  labels:
+    app: log-viewer
+    tier: ops
+    app.kubernetes.io/part-of: smart-library
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: log-viewer
+  template:
+    metadata:
+      labels:
+        app: log-viewer
+        tier: ops
+        app.kubernetes.io/part-of: smart-library
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: log-viewer
+          image: python:3.12-slim
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "http.server", "8080", "--directory", "/var/log/smartlibrary"]
+          ports:
+            - name: http
+              containerPort: 8080
+          volumeMounts:
+            - name: shared-logs
+              mountPath: /var/log/smartlibrary
+              readOnly: true
+          readinessProbe:
+            httpGet: {path: /, port: 8080}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+      volumes:
+        - name: shared-logs
+          persistentVolumeClaim:
+            claimName: smart-library-logs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: log-viewer
+  namespace: smart-library
+  labels:
+    app: log-viewer
+    app.kubernetes.io/part-of: smart-library
+spec:
+  type: ClusterIP
+  selector:
+    app: log-viewer
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

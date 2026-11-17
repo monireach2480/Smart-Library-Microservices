@@ -27,7 +27,7 @@ USERS = ["models/__init__.py", "models/user.py"]          # the shared `users` t
 PIP_DB = ["sqlalchemy>=2.0.30,<2.1", "psycopg2-binary>=2.9.9"]
 SERVICES = {
     # name: (port, shared files, extra pip packages)
-    "gateway":              (8000, BASE + ["core/balancer.py"],              ["httpx>=0.27,<1.0"]),
+    "gateway":              (8000, BASE + ["core/balancer.py", "core/observability.py"], ["httpx>=0.27,<1.0"]),
     "registration-service": (8001, DB + PWD + USERS,                         PIP_DB + ["argon2-cffi>=23.1", "email-validator>=2.1"]),
     "login-service":        (8002, DB + PWD + USERS,                         PIP_DB + ["argon2-cffi>=23.1", "email-validator>=2.1"]),
     "catalog-service":      (8003, DB,                                       PIP_DB),

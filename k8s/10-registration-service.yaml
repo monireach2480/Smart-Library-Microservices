@@ -1,0 +1,96 @@
+# Registration Service
+# Creates accounts (Argon2id password hashing). Shares auth_db with Login and Member.
+#
+# Not reachable from outside the cluster: this is a ClusterIP Service with no Ingress rule of its own.
+# All client traffic for it must go through the API Gateway (guideline 3).
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: registration-service
+  namespace: smart-library
+  labels:
+    app: registration-service
+    tier: backend
+    app.kubernetes.io/part-of: smart-library
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: registration-service
+  template:
+    metadata:
+      labels:
+        app: registration-service
+        tier: backend
+        app.kubernetes.io/part-of: smart-library
+    spec:
+      securityContext:
+        runAsUser: 1000          # the `app` user created in the Dockerfile
+        runAsGroup: 1000
+        fsGroup: 1000            # makes the shared log volume group-writable by that user
+      containers:
+        - name: registration-service
+          image: smart-library/registration-service:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8001
+          env:
+            # INSTANCE_ID = the Pod name, so X-Served-By identifies the exact replica
+            - name: INSTANCE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: smart-library-secrets
+                  key: AUTH_DATABASE_URL
+            - name: ADMIN_REGISTRATION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: smart-library-secrets
+                  key: ADMIN_REGISTRATION_KEY
+          envFrom:
+            - configMapRef:
+                name: smart-library-config
+            - secretRef:
+                name: smart-library-secrets
+          volumeMounts:
+            - name: shared-logs
+              mountPath: /var/log/smartlibrary     # matches LOG_DIR in the ConfigMap
+          readinessProbe:
+            httpGet: {path: /health, port: 8001}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet: {path: /health, port: 8001}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+      volumes:
+        - name: shared-logs
+          persistentVolumeClaim:
+            claimName: smart-library-logs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: registration-service
+  namespace: smart-library
+  labels:
+    app: registration-service
+    app.kubernetes.io/part-of: smart-library
+spec:
+  type: ClusterIP            # internal only - never a NodePort or a LoadBalancer
+  selector:
+    app: registration-service
+  ports:
+    - name: http
+      port: 8001
+      targetPort: 8001

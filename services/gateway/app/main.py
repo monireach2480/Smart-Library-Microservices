@@ -16,6 +16,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
 from app.core.balancer import UpstreamPool
+from app.core.observability import INSTANCE_ID, install as install_observability
 from app.core.security import ADMIN, decode_token
 
 # ---- where each microservice lives. A value may list several replicas, comma-separated:
@@ -81,6 +82,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Smart Library API Gateway", version="1.0.0", lifespan=lifespan)
+install_observability(app, "gateway")   # response headers + append to the shared access log
 
 
 def resolve(path: str) -> tuple[str, str] | None:
@@ -104,7 +106,7 @@ def root():
 
 @app.get("/health", tags=["ops"])
 def health():
-    return {"status": "ok", "service": "api-gateway"}
+    return {"status": "ok", "service": "api-gateway", "instance": INSTANCE_ID}
 
 
 @app.get("/health/services", tags=["ops"])
@@ -171,6 +173,7 @@ async def proxy(request: Request, rest: str):
 
     request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
     headers["x-request-id"] = request_id
+    request.state.request_id = request_id   # so the gateway's own shared-log line carries it too
     body = await request.body()
     pool = POOLS[service]
     upstream, used, failure = None, None, None
